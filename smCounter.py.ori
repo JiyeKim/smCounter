@@ -24,14 +24,8 @@ atgc = ('A', 'T', 'G', 'C')
 # function to calculate posterior probability for each barcode. 
 #-------------------------------------------------------------------------------------
 def calProb(oneBC, mtDrop):
-   # oneBC: {'3LMDR:00198:00085': [['G', 0.00039810717055349735, None]]}
-
-   print '....in calProb()'
-   print 'oneBC:', oneBC
-   print 'mtDrop:', mtDrop
-
    outDict = defaultdict(float)
-   if len(oneBC) <= mtDrop:  # number of reads <= mtDrop
+   if len(oneBC) <= mtDrop:
       outDict['A'] = 0.0
       outDict['T'] = 0.0
       outDict['G'] = 0.0
@@ -50,65 +44,41 @@ def calProb(oneBC, mtDrop):
 
       # get unique bases. Make sure uniqBaseList contains 4 members, unless the barcode already contains more than or equal to 4 bases/indels
       # NOTE: existBase contains only the alleles, including indels, with at least 1 read in the MT. uniqBase may contain more. 
-      existBase = set([info[0][0] for info in oneBC.values()])  # 'G'
-      uniqBase = set([info[0][0] for info in oneBC.values()])  # 'G'
+      existBase = set([info[0][0] for info in oneBC.values()])
+      uniqBase = set([info[0][0] for info in oneBC.values()])
       if len(uniqBase) < 4:
-        for b in atgc:  # ('A', 'T', 'G', 'C')
+        for b in atgc:
            if b not in uniqBase:
               uniqBase.add(b)
               if len(uniqBase) == 4:
-                 # When the uniqBase has 'A', 'T', 'G', 'C', it will be stop.
                  break
 
       uniqBaseList = list(uniqBase)
-      print 'uniqBase:', uniqBase, 'uniqBaseList:', uniqBaseList
 
       # set initial value in prodP to be 1.0
       for b in uniqBaseList:
          prodP[b] = 1.0
 
-
-      # prodP = {'A': 1.0, 'C': 1.0, 'T': 1.0, 'G': 1.0}
-
       for info in oneBC.values():
-         # info = [['G', 0.00039810717055349735, None]]
-         base = info[0][0]   # 'G'
+         base = info[0][0]
          # prob is the error probability
-         prob = info[0][1]  # 0.00039810717055349735
-         pairOrder = info[0][2]  # pairOrder; None
-
-         '''
+         prob = info[0][1]
+         pairOrder = info[0][2]
          if pairOrder != 'Paired':
             prob = 0.1
-         '''
-
          # prodP is the probability of no sequencing error for each base
          prodP[base] *= 1.0 - prob
          cnt[base] += 1
 
-         print 'prob--->', prob
          for char in list(uniqBase - set([base])):
             prodP[char] *= prob
-
-            '''
-            {'A': 1.0, 'C': 1.0, 'T': 1.0, 'G': 1.0}
-            {'A': 0.00039810717055349735, 'C': 1.0, 'T': 1.0, 'G': 1.0}
-            {'A': 0.00039810717055349735, 'C': 0.00039810717055349735, 'T': 1.0, 'G': 1.0}
-            {'A': 0.00039810717055349735, 'C': 0.00039810717055349735, 'T': 0.00039810717055349735, 'G': 1.0}
-            '''
 
          # rightP is the probabilty that there is no sequencing error, hence the alternative alleles come from PCR error
          rightP *= 1.0 - prob 
          
-      print 'prodP:', prodP
-      print 'rightP:', rightP
-      print 'cnt -->', cnt
-
-      for char in uniqBaseList:  # ['A', 'T', 'G', 'C']
+      for char in uniqBaseList:
          ratio = (cnt[char] + 0.5) / (len(oneBC) + 0.5 * len(uniqBaseList))
          pcrP[char] = 10.0 ** (-6.0 * ratio)
-         print 'ratio -->', ratio
-         print 'pcrP -->', pcrP
 
       for key in prodP.keys():
          if key in existBase:
@@ -124,7 +94,7 @@ def calProb(oneBC, mtDrop):
 
       for key in prodP.iterkeys():
          outDict[key] = 0.0 if sumP <= 0 else tmpOut[key] / sumP
-   print 'outDict --->', outDict
+
    return outDict
 
 #-------------------------------------------------------------------------------------
@@ -309,7 +279,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
    allBcDict = defaultdict(list) 
    alleleCnt = defaultdict(int)
    MTCnt = defaultdict(int)
-   r0BcEndPos = defaultdict(list)
    r1BcEndPos = defaultdict(list)
    r2BcEndPos = defaultdict(list)
    r2PrimerEndPos = defaultdict(list)
@@ -320,7 +289,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
    strongMTCnt = defaultdict(int)
    predIndex = defaultdict(lambda: defaultdict(float))
    finalDict = defaultdict(float)
-   r0Cnt = defaultdict(int)
    r1Cnt = defaultdict(int)
    r2Cnt = defaultdict(int)
    forwardCnt = defaultdict(int)
@@ -344,29 +312,19 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
    origRef = refseq.fetch(reference=chrom, start=int(pos)-1, end=int(pos))
    origRef = origRef.upper()
 
-   print chrom, pos, origRef
-
    # pile up reads
    for read in samfile.pileup(region = chrom + ':' + pos + ':' + pos, truncate=True, max_depth=1000000, stepper='nofilter'):
-      print '\ncoverage at base:', read.pos, '=', read.n
-
       for pileupRead in read.pileups:
          # read ID
          qname = pileupRead.alignment.query_name
          qnameSplit = qname.split(":")
          readid = ':'.join(qnameSplit[:-2])
-         print '*QNAME: ', qname, pileupRead.alignment.query_sequence[pileupRead.query_position]
-
          # barcode sequence
          BC = qnameSplit[-2]
-         print 'BC: ', BC
          # duplex tag - temporary hack from end of readid - should be CC, TT, or NN for duplex runs
          duplexTag = qnameSplit[-3]
-
          # mapping quality
          mq = pileupRead.alignment.mapping_quality
-         print 'mq: ', mq
-
          # get NM tag 
          NM = 0 
          allTags = pileupRead.alignment.tags
@@ -374,12 +332,9 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
             if tag == 'NM':
                NM = value
                break
-         print 'NM:', NM
-
          # count number of INDELs in the read sequence
          nIndel = 0
          cigar = pileupRead.alignment.cigar
-         print 'cigar: ', cigar
          cigarOrder = 1
          leftSP = 0  # soft clipped bases on the left
          rightSP = 0  # soft clipped bases on the right
@@ -392,7 +347,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
             if cigarOrder > 1 and op == 4:
                rightSP += value
             cigarOrder += 1
-         print 'nIndel:', nIndel, 'cigarOrder:', cigarOrder, 'leftSP:', leftSP, 'rightSP:', rightSP
 
          # Number of mismatches except INDEL, including softcilpped sequences 
          mismatch = max(0, NM - nIndel)
@@ -400,26 +354,20 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
          readLen = pileupRead.alignment.query_length
          # calculate mismatch per 100 bases
          mismatchPer100b = 100.0 * mismatch / readLen if readLen > 0 else 0.0
-         print 'mismatch:', mismatch, 'readLen:', readLen, 'mismatchPer100b:', mismatchPer100b
 
          # paired read
-         print 'is_read1:', pileupRead.alignment.is_read1, 'is_read2:', pileupRead.alignment.is_read2
          if pileupRead.alignment.is_read1:
             pairOrder = 'R1'
          if pileupRead.alignment.is_read2:
             pairOrder = 'R2'
-         if (pileupRead.alignment.is_read1 is False) and (pileupRead.alignment.is_read2 is False):
-            # in case of single-end reads 
-            pairOrder = None
 
          # +/- strand
          strand = 'Reverse' if pileupRead.alignment.is_reverse else 'Forward'
-         print 'strand:', strand, 'pairOrder:', pairOrder, pileupRead.alignment.is_reverse
 
          # coverage -- read, not fragment
          cvg += 1
 
-         # 1. check if the site is the beginning of insertion
+         # check if the site is the beginning of insertion
          if pileupRead.indel > 0:
             site = pileupRead.alignment.query_sequence[pileupRead.query_position]
             inserted = pileupRead.alignment.query_sequence[(pileupRead.query_position + 1) : (pileupRead.query_position + 1 +  pileupRead.indel)]
@@ -428,23 +376,20 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
             bqSum[base] += bq
             # inclusion condition
             incCond = bq >= minBQ and mq >= minMQ and mismatchPer100b <= mismatchThr
-            print '!incCond:', incCond, 'bq:', bq, 'mq:', mq, 'minMQ:', minMQ, 'mismatchThr:', mismatchThr
             alleleCnt[base] += 1
             mismatchCnt[base] += mismatchPer100b
             if pairOrder == 'R1':
                r1Cnt[base] += 1
-            elif pairOrder == 'R2':
+            if pairOrder == 'R2':
                r2Cnt[base] += 1
-            else:
-               r0Cnt[base] += 1 
+
             if strand == 'Reverse':
                reverseCnt[base] += 1
             else:
                forwardCnt[base] += 1
-
-         # 2. check if the site is the beginning of deletion
+            
+         # check if the site is the beginning of deletion
          elif pileupRead.indel < 0:
-            print '-----> elif pileupRead.indel < 0', pileupRead.indel
             site = pileupRead.alignment.query_sequence[pileupRead.query_position]
             deleted = refseq.fetch(reference=chrom, start=int(pos), end=int(pos)+abs(pileupRead.indel))
             deleted = deleted.upper()
@@ -457,16 +402,15 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
             mismatchCnt[base] += mismatchPer100b
             if pairOrder == 'R1':
                r1Cnt[base] += 1
-            elif pairOrder == 'R2':
+            if pairOrder == 'R2':
                r2Cnt[base] += 1
-            else:
-               r0Cnt[base] += 1
+
             if strand == 'Reverse':
                reverseCnt[base] += 1
             else:
                forwardCnt[base] += 1
             
-         # 3. site is not beginning of any INDEL
+         # site is not beginning of any INDEL
          else:
             # If the site ifself is a deletion, set quality = minBQ 
             if pileupRead.is_del:
@@ -483,10 +427,8 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
                # count the number of low quality reads (less than Q20 by default) for each base
                if bq < minBQ:
                   lowQReads[base] += 1
-
                # inclusion condition
                incCond = bq >= minBQ and mq >= minMQ and mismatchPer100b <= mismatchThr
-
                if pairOrder == 'R1':
                   # distance to the barcode end in R1; 
                   if pileupRead.alignment.is_reverse:
@@ -496,7 +438,7 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
                   if incCond:
                      r1BcEndPos[base].append(distToBcEnd)
                   r1Cnt[base] += 1
-               elif pairOrder == 'R2':
+               if pairOrder == 'R2':
                   # distance to the barcode and/or primer end in R2. Different cases for forward and reverse strand
                   if pileupRead.alignment.is_reverse:
                      distToBcEnd = pileupRead.query_position - leftSP
@@ -508,45 +450,20 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
                      r2BcEndPos[base].append(distToBcEnd)
                      r2PrimerEndPos[base].append(distToPrimerEnd)
                   r2Cnt[base] += 1
-               else:
-                  if pileupRead.alignment.is_reverse:
-                     distToBcEnd = pileupRead.alignment.query_alignment_length - (pileupRead.query_position - leftSP)
-                  else:
-                     distToBcEnd = pileupRead.query_position - leftSP
-                  if incCond:
-                     r0BcEndPos[base].append(distToBcEnd)
-                  r0Cnt[base] += 1
-
 
                if strand == 'Reverse':
                   reverseCnt[base] += 1
                else:
                   forwardCnt[base] += 1
 
-               print 'distToBcEnd:', distToBcEnd
-               print 'r2BcEndPos:', r2BcEndPos
-               print 'r2PrimerEndPos:', r2PrimerEndPos
-
             alleleCnt[base] += 1
             mismatchCnt[base] += mismatchPer100b
-
-         # print 'pileupRead.indel:', pileupRead.indel, 'site:', site or None, 'inserted:', inserted
-         print 'base:', base, 'bq:', bq
-         print 'bqSum:', bqSum
-         print 'alleleCnt: ', alleleCnt
-         print 'mismatchCnt: ', mismatchCnt
-         print 'r1Cnt: ', r1Cnt, 'r2Cnt: ', r2Cnt
-         print 'reverseCnt:', reverseCnt
-         print 'forwardCnt:', forwardCnt
 
          # count total number of fragments and MTs
          if readid not in allBcDict[BC]:
             allBcDict[BC].append(readid)
-         print 'allBcDict:', allBcDict
 
          # decide which read goes into analysis
-
-         print '========================> incCond:', incCond
          if incCond:
             if readid not in bcDict[BC]:
                prob = pow(10.0, -bq / 10.0)
@@ -560,57 +477,34 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
             else:
                del bcDict[BC][readid]
                discordPairCnt[base] += 1
-            print 'bcDict:', bcDict
-         print '-'*30
-      print '=' * 30
-      print 'allBcDict:', allBcDict
-      print 'bcDict:', bcDict
-   ##### endfor ####
-    
+         
    # total number of MT, fragments, reads, including those dropped from analysis
    allMT = len(allBcDict)
    allFrag = sum([len(allBcDict[bc]) for bc in allBcDict])
-   print 'allMt: ', allMT, 'allFrag: ', allFrag
 
    # downsampling MTs (not dropped) to args.maxMT
-
    ds = maxMT if maxMT > 0 else int(round(2.0 * mtDepth))
 
    # MTs used
    usedMT = min(ds, len(bcDict))
-   print 'ds: ', ds, 'len(bcDict): ', len(bcDict), '---> usedMT: ', usedMT
-
+   
    # done if zero coverage (note hack for 41 blank output fields!)
-   if usedMT == 0:  # no reads
+   if usedMT == 0:
       out_long = '\t'.join([chrom, pos, origRef] + ['']*41 + ['Zero_Coverage'])
       return out_long
       
    if len(bcDict) > ds:
       random.seed(pos)
-      bcKeys = random.sample(bcDict.keys(), ds)  # choose random one among barcodes
-      print 'bcKeys:', bcKeys
+      bcKeys = random.sample(bcDict.keys(), ds)
    else:
       bcKeys = bcDict.keys()
-   usedFrag = sum([len(bcDict[bc]) for bc in bcKeys])  # number of reads
-   print 'usedFrag:', usedFrag
+   usedFrag = sum([len(bcDict[bc]) for bc in bcKeys])
 
    totalR1 = sum(r1Cnt.values())
    totalR2 = sum(r2Cnt.values())
-   totlaR0 = sum(r0Cnt.values())
-   print 'totalR1:', totalR1, 'totalR2:', totalR2, 'totlaR0:', totlaR0
 
    for bc in bcKeys:
       bcProb = calProb(bcDict[bc], mtDrop)
-      print 'bc:', bc, 'bcProb:', bcProb
-
-      '''
-      bcProb = {
-          'A': 0.0009066429730636374,
-          'INS|G|GA': 0.9972800710808093,
-          'G': 0.0009066429730636374,
-          'T': 0.0009066429730636374
-      }
-      '''
       for char in bcProb.iterkeys():
          x = 1.0 - bcProb[char]
          log10P = -math.log10(x) if x > 0.0 else 16.0
@@ -618,18 +512,12 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
          finalDict[char] += log10P
 
       max_base = [x for x in predIndex[bc].keys() if  predIndex[bc][x] == max(predIndex[bc].values())]
-      print 'max_base ---->', max_base
-      # max_base: ['G']  the base which has max log10 value in one barcode
-      
-      print 'bcDict[bc]---->', bcDict[bc]
       if len(max_base) == 1:
          cons = max_base[0]
          MTCnt[cons] += 1
          if predIndex[bc][cons] > smt:
-            strongMTCnt[cons] += 1
-
+            strongMTCnt[cons] += 1           
       # Tie in max predIndex is most likely due to single read MT. 
-
       elif len(bcDict[bc]) == 1:
          cons = bcDict[bc].values()[0][0][0]
          MTCnt[cons] += 1
@@ -643,13 +531,7 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
       if len(bcDict[bc]) >= 10:
          MT10Cnt += 1
 
-   print 'predIndex:', predIndex
-   print 'finalDict:', finalDict
-   print 'strongMTCnt:', strongMTCnt
-   print 'MTCnt:', MTCnt
-
    sortedList = sorted(finalDict.items(), key=operator.itemgetter(1), reverse=True)
-   print 'sortedList:', sortedList
    maxBase = sortedList[0][0]
    maxPI   = sortedList[0][1]
    secondMaxBase = sortedList[1][0]
@@ -658,9 +540,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
    # call variants
    origAlt = secondMaxBase if maxBase == origRef else maxBase
    altPI   = secondMaxPI   if maxBase == origRef else maxPI
-   print 'origAlt:', origAlt
-   print 'altPI:', altPI
-
 
    # convert from internal smCounter format to format needed for output
    (ref, alt, vtype) = convertToVcf(origRef,origAlt)
@@ -718,15 +597,18 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen, mismatchThr, mtDr
    outvec.extend(predIdx)
    outvec.append(fltr)
    out_long = '\t'.join((str(x) for x in outvec))
-   print out_long
    return out_long
 
 #------------------------------------------------------------------------------------------------
 # wrapper function for "vc()" - because Python multiprocessing module does not pass stack trace
 #------------------------------------------------------------------------------------------------
 def vc_wrapper(*args):
-    output = vc(*args)
-    return output
+   try:
+      output = vc(*args)
+   except:
+      print("Exception thrown in vc() function at genome location:", args[1], args[2])
+      output = "Exception thrown!\n" + traceback.format_exc()
+   return output
 
 #------------------------------------------------------------------------------------------------
 # global for argument parsing (hack that works when calling from either command line or pipeline)
@@ -761,28 +643,11 @@ def argParseInit():  # this is done inside a function because multiprocessing mo
 # main function
 #--------------------------------------------------------------------------------------
 def main(args):
-   '''
-   args = [ 
-       '../variantcalls_smcounter/sample1_new.bam',
-       'chr10',
-       '123239441',
-       20,  # MinBQ
-       30,  # minMQ
-       0.1,  # mtDepth
-       1.5,  # rpb: mean read pairs per MT
-       10,  # hpLen: Minimum length for homopolymers
-       6.0,  # mismatchThr
-       0,  # mtDrop
-       3,  # maxMT # I fixted it!
-       2,  # primerDist
-       '/Users/kimjiye/data/hg19/chr10.fa',  # refGenome
-   ]
-   '''
 
    # log run start
    timeStart = datetime.datetime.now()
-   print "smCounter started at " + str(timeStart)
-
+   print("smCounter started at " + str(timeStart))
+   
    # if argument parser global not assigned yet, initialize it
    if parser == None:
       argParseInit()
@@ -813,18 +678,14 @@ def main(args):
          (chrom, regionStart, regionEnd) = line.strip().split('\t')[0:3]
          for pos in range(int(regionStart),int(regionEnd)):
             locList.append((chrom, str(pos+1)))
-   print 'locList ---->', locList
+
+   # call variants in parallel
    pool = multiprocessing.Pool(processes=args.nCPU)
-   results = [pool.apply_async(
-       vc_wrapper, args=(args.bamFile, x[0], x[1], args.minBQ, args.minMQ,
-                         args.mtDepth, args.rpb, args.hpLen, args.mismatchThr,
-                         args.mtDrop, args.maxMT, args.primerDist, args.refGenome)
-       ) for x in locList
-   ]
+   results = [pool.apply_async(vc_wrapper, args=(args.bamFile, x[0], x[1], args.minBQ, args.minMQ, args.mtDepth, args.rpb, args.hpLen, args.mismatchThr, args.mtDrop, args.maxMT, args.primerDist, args.refGenome)) for x in locList]
    output = [p.get() for p in results]
    pool.close()
    pool.join()
-
+   
    # check for exceptions thrown by vc()
    for idx in range(len(output)):
       line = output[idx]
@@ -832,8 +693,6 @@ def main(args):
          print(line)
          raise Exception("Exception thrown in vc() at location: " + str(locList[idx]))
    
-
-   '''
    # report start of variant filtering
    print("begin variant filtering and output")
    
@@ -879,49 +738,35 @@ def main(args):
    os.remove(args.outPrefix + '.tmp.repeatMasker.bed')
    os.remove(args.outPrefix + '.tmp.target.repeats1.bed')
    os.remove(args.outPrefix + '.tmp.target.repeats2.bed')
-   '''
 
    # set up header columns (Note: "headerAll" must parallel the output of the vc() function.)
-   headerAll = ('CHROM', 'POS', 'REF', 'ALT', 'TYPE', 'DP', 'FR' ,
-                'MT', 'UFR', 'UMT', 'PI', 'VDP', 'VAF', 'VMT', 'VMF',
-                'VSM', 'DP_A', 'DP_T', 'DP_G', 'DP_C', 'AF_A', 'AF_T', 'AF_G',
-                'AF_C', 'MT_3RPM', 'MT_5RPM', 'MT_7RPM', 'MT_10RPM', 'UMT_A',
-                'UMT_T', 'UMT_G', 'UMT_C', 'UMF_A', 'UMF_T', 'UMF_G', 'UMF_C',
-                'VSM_A', 'VSM_T', 'VSM_G', 'VSM_C', 'PI_A', 'PI_T', 'PI_G', 'PI_C', 'FILTER')
-   headerVariants = ('CHROM', 'POS', 'REF', 'ALT', 'TYPE', 'DP', 'MT', 'UMT',
-                     'PI', 'THR', 'VMT', 'VMF', 'VSM', 'FILTER')
+   headerAll      = ('CHROM', 'POS', 'REF', 'ALT', 'TYPE', 'DP', 'FR' , 'MT', 'UFR', 'UMT', 'PI',        'VDP', 'VAF', 'VMT', 'VMF', 'VSM', 'DP_A', 'DP_T', 'DP_G', 'DP_C', 'AF_A', 'AF_T', 'AF_G', 'AF_C', 'MT_3RPM', 'MT_5RPM', 'MT_7RPM', 'MT_10RPM',  'UMT_A', 'UMT_T', 'UMT_G', 'UMT_C', 'UMF_A', 'UMF_T', 'UMF_G', 'UMF_C', 'VSM_A', 'VSM_T', 'VSM_G', 'VSM_C', 'PI_A', 'PI_T', 'PI_G', 'PI_C', 'FILTER')
+   headerVariants = ('CHROM', 'POS', 'REF', 'ALT', 'TYPE', 'DP',        'MT',        'UMT', 'PI', 'THR',               'VMT', 'VMF', 'VSM', 'FILTER')
 
    # set up hash of variable fields
    headerAllIndex = {}
    for i in range(len(headerAll)):
       headerAllIndex[headerAll[i]] = i
-
-   print 'headerAllIndex:', headerAllIndex
+   
    # ALL repeats filter. If MT fraction < 40% and the variant is inside the tandem repeat region, reject.
    for i in range(len(output)):
       outline = output[i]
       lineList = outline.split('\t')
-      print 'lineList:', lineList
       chromTr = lineList[headerAllIndex['CHROM']]
       altTr   = lineList[headerAllIndex['ALT']]
-      print 'chromTr:', chromTr, 'altTr:', altTr, 'posTr'
       try:
          posTr = int(lineList[headerAllIndex['POS']])
-         print 'posTr:', posTr
       except ValueError:
          continue
       try:
          altMtFracTr = float(lineList[headerAllIndex['VMF']])
-         print 'altMtFracTr:', altMtFracTr
       except ValueError:
          continue
       try:
          pred = int(float(lineList[headerAllIndex['PI']]))
-         print 'pred:', pred
       except ValueError:
          pred = 0
 
-      '''
       if pred >= 5 and altTr != 'DEL':
          # check tandem repeat from TRF if MT fraction < 40%
          if altMtFracTr < 40:
@@ -935,7 +780,6 @@ def main(args):
             if locL < posTr <= locR:
                lineList[-1] += repType
                break
-      '''
 
       lineList[-1] = 'PASS' if lineList[-1] == ';' else lineList[-1].strip(';')
       output[i] = '\t'.join(lineList)
@@ -986,7 +830,6 @@ def main(args):
    outVcf.write(header_vcf)
    
    for line in output:
-      print 'line--->', line
       # write to the detailed output
       outAll.write(line)
       outAll.write("\n")
@@ -1002,8 +845,7 @@ def main(args):
       # get ALT and prediction index
       ALT = fields[headerAllIndex['ALT']]
       QUAL = str(int(float(PI))) # truncate PI to conform to VCF phred-like tradition
-      print 'ALT:', ALT, 'QUAL:', QUAL
-      '''
+
       # write to vcf file and short output
       if int(QUAL) >= threshold and ALT != 'DEL': # if PI > threshold, write to vcf (regardless of filters)
       
@@ -1053,53 +895,6 @@ def main(args):
             numCalledSnps   = 0
          else:
             numCalledIndels = 0
-      '''
-      # parse fields needed from main data vector
-      CHROM = fields[headerAllIndex['CHROM']]
-      POS = fields[headerAllIndex['POS']]
-      REF = fields[headerAllIndex['REF']]
-      TYPE = fields[headerAllIndex['TYPE']]
-      DP    = fields[headerAllIndex['DP']]
-      MT    = fields[headerAllIndex['MT']]
-      UMT   = fields[headerAllIndex['UMT']]
-      VMT   = fields[headerAllIndex['VMT']]
-      VMF   = fields[headerAllIndex['VMF']]
-      VSM   = fields[headerAllIndex['VSM']]
-      FILTER= fields[headerAllIndex['FILTER']]
-      THR   = str(threshold)
-      INFO = ';'.join(('TYPE='+TYPE, 'DP='+DP, 'MT='+MT, 'UMT='+UMT, 'PI='+PI, 'THR='+THR, 'VMT='+VMT, 'VMF='+VMF, 'VSM='+VSM))
-         
-      # hack attempt to satisfy downstream software - not correct for germline heterozygous, male X, etc, etc, etc 
-      alts = ALT.split(",")
-      if len(alts) == 2:
-         genotype = '1/2'
-      elif len(alts) != 1:
-         raise Exception("error hacking genotype field for " + alts)
-      elif CHROM == "chrY" or CHROM == "chrM":
-         genotype = '1'
-      elif float(VMF) > 0.95:
-         genotype = '1/1'
-      else:
-         genotype = '0/1'
-      REFMT = str(int(UMT) - int(VMT))
-      AD = REFMT + "," + VMT
-      if len(alts) == 2:
-         AD = AD + ",1"  # horrific hack for the 2nd alt
-
-      # output
-      FORMAT = 'GT:AD:VF'
-      SAMPLE = ":".join((genotype,AD,VMF))
-      ID     = '.'
-      vcfLine   = '\t'.join((CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, SAMPLE)) + '\n'
-      shortLine = '\t'.join((CHROM, POS,     REF, ALT, TYPE, DP, MT, UMT, PI, THR, VMT, VMF, VSM, FILTER)) + '\n' 
-      outVcf.write(vcfLine)
-      outVariants.write(shortLine)
-        
-      # debug counter for summary
-      if TYPE == 'SNP':
-         numCalledSnps   = 0
-      else:
-         numCalledIndels = 0
 
    outVcf.close()
    outAll.close()
@@ -1112,7 +907,7 @@ def main(args):
    
    # pass threshold back to caller
    return threshold
-
+   
 #----------------------------------------------------------------------------------------------
 # pythonism to run from the command line
 #----------------------------------------------------------------------------------------------
