@@ -976,7 +976,7 @@ def main(args):
     headerAllIndex = {}
     for i in range(len(headerAll)):
         headerAllIndex[headerAll[i]] = i
-    '''
+    
     # ALL repeats filter. If MT fraction < 40% and the variant is inside the tandem repeat region, reject.
     for i in range(len(output)):
         outline = output[i]
@@ -995,7 +995,7 @@ def main(args):
             pred = int(float(lineList[headerAllIndex['PI']]))
         except ValueError:
             pred = 0
-
+        '''
         if pred >= 5 and altTr != 'DEL':
             # check tandem repeat from TRF if MT fraction < 40%
             if altMtFracTr < 40:
@@ -1009,10 +1009,10 @@ def main(args):
                 if locL < posTr <= locR:
                     lineList[-1] += repType
                     break
-
+        '''
         lineList[-1] = 'PASS' if lineList[-1] == ';' else lineList[-1].strip(';')
         output[i] = '\t'.join(lineList)
-    '''
+    
 
     # VCF header
     header_vcf = \
