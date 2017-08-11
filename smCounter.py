@@ -360,8 +360,8 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
             qname = pileupRead.alignment.query_name
             qnameSplit = qname.split(":")
             readid = ':'.join(qnameSplit[:-2])
-            print '\n\n*QNAME:{}, base:{}'.format(qname,
-                pileupRead.alignment.query_sequence[pileupRead.query_position])
+
+            print '\n\n*QNAME:{}'.format(qname)
             print 'Query sequence:{}'.format(pileupRead.alignment.query_sequence)
 
             # barcode sequence
@@ -572,11 +572,12 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
             print 'strand:{}'.format(strand)
 
             print '=== incCond:{} ==='.format(incCond)
+            '''
             print '\t--bq >= minBQ ? {} >= {}, {}'.format(bq, minBQ, bq >= minBQ)
             print '\t--mq >= minMQ ? {} >= {}, {}'.format(mq, minMQ, mq >= minMQ)
             print '\tmismatch% <= mismatchThr ? {} <= {}, {}'.format(
                 mismatchPer100b, mismatchThr, mismatchPer100b <= mismatchThr)
-
+            '''
             # print 'bqSum:{}'.format(bqSum)
             # print 'alleleCnt:{}'.format(alleleCnt)
             # print 'mismatchCnt:{}'.format(mismatchCnt)
@@ -608,13 +609,16 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
                 else:
                     del bcDict[BC][readid]
                     discordPairCnt[base] += 1
+            else:
+                continue
 
-            # print '=== bcDict ===\n{}'.format(bcDict)
+            print '=== bcDict ===\n{}'.format(bcDict)
             print '-'*60
+        
+
         print 'at position {}:{} result---------'.format(chrom, pos)
         print 'Total Barcodes:{}'.format(len(allBcDict))
         print 'Passed Barcodes:{}'.format(len(bcDict))
-
         print '=' * 60
 
     print 'final BcDict------'
@@ -624,23 +628,11 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
     '''
     allBcDict = {
         'chr10-0-43606627-CAAAACGCAATA': ['3LMDR:00595:00544'],
-        'chr10-0-43606655-CAAAACGCAATA': ['3LMDR:00324: 00302'],
-        'chr10-0-43606599-CAAAACGCAATA': ['3LMDR:00901:00749'],
-        'chr10-1-43606666-undefined': ['3LMDR:00070:00159'],
-        'chr10-0-43606620-undefined': ['3LMDR:00579:00678',
-                                       '3LMDR:00705:00445'],
         'chr10-1-43606567-TATTGCGTTTTG': ['3LMDR:00318:00485',
-                                          '3LMDR:01078:01158'],
-        'chr10-0-43606633-CAAAACGCAATA': ['3LMDR:00738:00133']}
+    }                                     '3LMDR:01078:01158'],
     bcDict = {
         'chr10-0-43606627-CAAAACGCAATA': {
             '3LMDR:00595:00544': [['A', 0.00031622776601683794, None]]},
-        'chr10-0-43606655-CAAAACGCAATA': {
-            '3LMDR:00324:00302': [['G', 0.00039810717055349735, None]]},
-        'chr10-0-43606599-CAAAACGCAATA': {
-            '3LMDR:00901:00749': [['G', 0.0025118864315095794, None]]},
-        'chr10-0-43606605-CAAAACGCAATA': {
-            '3LMDR:00663:00090': [['G', 0.00039810717055349735, None]]},
         'chr10-1-43606567-TATTGCGTTTTG': {
             '3LMDR:00839:00334': [['G', 0.0012589254117941675, None]],
             '3LMDR:01078:01158': [['G', 0.0025118864315095794, None]],
@@ -649,7 +641,7 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
     }
     '''
     ##### endfor ####
-     
+
     # total number of MT, fragments, reads, including those dropped from analysis
     allMT = len(allBcDict)  # number of barcodes
     allFrag = sum([len(allBcDict[bc]) for bc in allBcDict])  # number of reads
@@ -817,7 +809,7 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
     outvec.extend(predIdx)
     outvec.append(fltr)
     out_long = '\t'.join((str(x) for x in outvec))
-    print out_long
+    print 'out_log====>{}'.format(out_long)
     return out_long
 
 #------------------------------------------------------------------------------------------------
@@ -894,6 +886,7 @@ def main(args):
             (chrom, regionStart, regionEnd) = line.strip().split('\t')[0:3]
             for pos in range(int(regionStart),int(regionEnd)):
                 locList.append((chrom, str(pos+1)))
+
     print 'locList ----> {}'.format(locList)
     pool = multiprocessing.Pool(processes=args.nCPU)
     results = [pool.apply_async(
@@ -903,6 +896,7 @@ def main(args):
          ) for x in locList
     ]
     output = [p.get() for p in results]
+
     pool.close()
     pool.join()
 
@@ -910,7 +904,6 @@ def main(args):
     for idx in range(len(output)):
         line = output[idx]
         if line.startswith("Exception thrown!"):
-            print(line)
             raise Exception("Exception thrown in vc() at location: " + str(locList[idx]))
     
 
@@ -982,7 +975,7 @@ def main(args):
         outline = output[i]
         lineList = outline.split('\t')
         chromTr = lineList[headerAllIndex['CHROM']]
-        altTr   = lineList[headerAllIndex['ALT']]
+        # altTr   = lineList[headerAllIndex['ALT']]
         try:
             posTr = int(lineList[headerAllIndex['POS']])
         except ValueError:
