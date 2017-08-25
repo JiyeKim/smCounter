@@ -1,4 +1,4 @@
-# smCounter: barcode-aware variant caller 
+# smCounter: barcode-aware variant caller
 # Chang Xu. 23May2016; online version of 10APR2017
 import os
 import datetime
@@ -827,25 +827,25 @@ def argParseInit(): # this is done inside a function because multiprocessing mod
     global parser
     parser = argparse.ArgumentParser(description='Variant calling using molecular barcodes', fromfile_prefix_chars='@')
     parser.add_argument('--outPrefix', default=None, required=True, help='prefix for output files')
-    parser.add_argument('--bamFile' , default=None, required=True, help='BAM file')
+    parser.add_argument('--bamFile', default=None, required=True, help='BAM file')
     parser.add_argument('--bedTarget', default=None, required=True, help='BED file for target region')
-    parser.add_argument('--mtDepth' , default=None, required=True, type=int, help='Mean MT depth')
-    parser.add_argument('--rpb'     , default=None, required=True, type=float, help='Mean read pairs per MT')
-    parser.add_argument('--nCPU'        , type=int, default=1 , help='number of CPUs to use in parallel')
-    parser.add_argument('--minBQ'       , type=int, default=20, help='minimum base quality allowed for analysis')
-    parser.add_argument('--minMQ'       , type=int, default=30, help='minimum mapping quality allowed for analysis')
-    parser.add_argument('--hpLen'       , type=int, default=10, help='Minimum length for homopolymers')
+    parser.add_argument('--mtDepth', default=None, required=True, type=int, help='Mean MT depth')
+    parser.add_argument('--rpb', default=None, required=True, type=float, help='Mean read pairs per MT')
+    parser.add_argument('--nCPU', type=int, default=1 , help='number of CPUs to use in parallel')
+    parser.add_argument('--minBQ', type=int, default=20, help='minimum base quality allowed for analysis')
+    parser.add_argument('--minMQ', type=int, default=30, help='minimum mapping quality allowed for analysis')
+    parser.add_argument('--hpLen', type=int, default=10, help='Minimum length for homopolymers')
     parser.add_argument('--mismatchThr', type=float, default=6.0, help='average number of mismatches per 100 bases allowed')
-    parser.add_argument('--mtDrop'    , type=int, default=0, help='Drop MTs with lower than or equal to X reads.')
-    parser.add_argument('--maxMT'         , type=int, default=0, help='Randomly downsample to X MTs (max number of MTs at any position). If set to 0 (default), maxMT = 2.0 * mean MT depth')
-    parser.add_argument('--primerDist' , type=int, default=2, help='filter variants that are within X bases to primer')
-    parser.add_argument('--threshold'  , type=int, default=0, help='Minimum prediction index for a variant to be called. Must be non-negative. Typically ranges from 10 to 60. If set to 0 (default), smCounter will choose the appropriate cutoff based on the mean MT depth.')
-    parser.add_argument('--refGenome'               , default = '/qgen/home/rvijaya/downloads/alt_hap_masked_ref/ucsc.hg19.fasta')
-    parser.add_argument('--bedTandemRepeats'        , default = '/qgen/home/xuc/UCSC/simpleRepeat.bed', help = 'bed for UCSC tandem repeats')
+    parser.add_argument('--mtDrop', type=int, default=0, help='Drop MTs with lower than or equal to X reads.')
+    parser.add_argument('--maxMT', type=int, default=0, help='Randomly downsample to X MTs (max number of MTs at any position). If set to 0 (default), maxMT = 2.0 * mean MT depth')
+    parser.add_argument('--primerDist', type=int, default=2, help='filter variants that are within X bases to primer')
+    parser.add_argument('--threshold', type=int, default=0, help='Minimum prediction index for a variant to be called. Must be non-negative. Typically ranges from 10 to 60. If set to 0 (default), smCounter will choose the appropriate cutoff based on the mean MT depth.')
+    parser.add_argument('--refGenome', default = '/qgen/home/rvijaya/downloads/alt_hap_masked_ref/ucsc.hg19.fasta')
+    parser.add_argument('--bedTandemRepeats', default = '/qgen/home/xuc/UCSC/simpleRepeat.bed', help = 'bed for UCSC tandem repeats')
     parser.add_argument('--bedRepeatMaskerSubset', default = '/qgen/home/xuc/UCSC/SR_LC_SL.nochr.bed', help = 'bed for RepeatMasker simple repeats, low complexity, microsatellite regions')
-    parser.add_argument('--bedtoolsPath'            , default = '/qgen/bin/bedtools-2.25.0/bin/', help = 'path to bedtools')
-    parser.add_argument('--runPath' , default=None, help='path to working directory')
-    parser.add_argument('--logFile' , default=None, help='log file')
+    parser.add_argument('--bedtoolsPath', default = '/qgen/bin/bedtools-2.25.0/bin/', help = 'path to bedtools')
+    parser.add_argument('--runPath', default=None, help='path to working directory')
+    parser.add_argument('--logFile', default=None, help='log file')
     parser.add_argument('--paramFile', default=None, help='optional parameter file that contains the above paramters. if specified, this must be the only parameter, except for --logFile.')
     
 #--------------------------------------------------------------------------------------
@@ -884,15 +884,19 @@ def main(args):
     for line in open(args.bedTarget, 'r'):
         if not line.startswith("track "):
             (chrom, regionStart, regionEnd) = line.strip().split('\t')[0:3]
-            for pos in range(int(regionStart),int(regionEnd)):
+            for pos in range(int(regionStart), int(regionEnd)):
                 locList.append((chrom, str(pos+1)))
 
     print 'locList ----> {}'.format(locList)
     pool = multiprocessing.Pool(processes=args.nCPU)
-    results = [pool.apply_async(
-         vc_wrapper, args=(args.bamFile, x[0], x[1], args.minBQ, args.minMQ,
-                                 args.mtDepth, args.rpb, args.hpLen, args.mismatchThr,
-                                 args.mtDrop, args.maxMT, args.primerDist, args.refGenome)
+    results = [
+        pool.apply_async(
+            vc_wrapper,
+            args=(
+                args.bamFile, x[0], x[1], args.minBQ, args.minMQ,
+                args.mtDepth, args.rpb, args.hpLen, args.mismatchThr,
+                args.mtDrop, args.maxMT, args.primerDist, args.refGenome
+            )
          ) for x in locList
     ]
     output = [p.get() for p in results]
@@ -906,23 +910,49 @@ def main(args):
         if line.startswith("Exception thrown!"):
             raise Exception("Exception thrown in vc() at location: " + str(locList[idx]))
     
-
-    '''
     # report start of variant filtering
     print("begin variant filtering and output")
     
     # merge and sort RepeatMasker tracks (could be done prior to run)  Note: assuming TRF repeat already merged and sorted!!
     bedExe = args.bedtoolsPath + 'bedtools'
     bedRepeatMasker = args.outPrefix + '.tmp.repeatMasker.bed'
-    subprocess.check_call(bedExe + ' merge -c 4 -o distinct -i ' + args.bedRepeatMaskerSubset + ' | ' + bedExe + ' sort -i - > ' + bedRepeatMasker, shell=True)
+    cmd = ('{bedExe} merge -c 4 -o distinct -i {repeatbed} | '
+           '{bedExe} sort -i - > {out}').format(
+            bedExe=bedExe,
+            repeatbed=args.bedRepeatMaskerSubset,
+            out=bedRepeatMasker
+          )
+    subprocess.check_call(cmd, shell=True)
 
     # merge and sort target region
     bedTarget = args.outPrefix + '.tmp.target.bed'
-    subprocess.check_call(bedExe + ' merge -i ' + args.bedTarget + ' | ' + bedExe + ' sort -i - > ' + bedTarget, shell=True)
+    cmd = ('{bedExe} merge -i {targetbed} | '
+           '{bedExe} sort -i - > {out}').format(
+            bedExe=bedExe,
+            targetbed=args.bedTarget,
+            out=bedTarget,
+          )
+    subprocess.check_call(cmd, shell=True)
     
-    # intersect 2 repeats tracks with target region
-    subprocess.check_call(bedExe + ' intersect -a ' + args.bedTandemRepeats + ' -b ' + bedTarget + ' | ' + bedExe + ' sort -i - > ' + args.outPrefix + '.tmp.target.repeats1.bed', shell=True)
-    subprocess.check_call(bedExe + ' intersect -a ' + bedRepeatMasker           + ' -b ' + bedTarget + ' | ' + bedExe + ' sort -i - > ' + args.outPrefix + '.tmp.target.repeats2.bed', shell=True)
+    # intersect 2 repeats tracks with target region (for tandem repeats)
+    cmd = ('{bedExe} intersect -a {repeatbed} -b {targetbed} | '
+           '{bedExe} sort -i - > {outprefix}.tmp.target.repeats1.bed').format(
+           bedExe=bedExe,
+           repeatbed=args.bedTandemRepeats,
+           targetbed=bedTarget,
+           outprefix=args.outPrefix,
+          )
+    subprocess.check_call(cmd, shell=True)
+
+    # for simple repeats
+    cmd = ('{bedExe} intersect -a {repeatbed} -b {targetbed} | '
+          '{bedExe} sort -i -> {outprefix}.tmp.target.repeats2.bed').format(
+           bedExe=bedExe,
+           repeatbed=bedRepeatMasker,
+           targetbed=bedTarget,
+           outprefix=args.outPrefix,
+          )
+    subprocess.check_call(cmd, shell=True)
 
     # read in tandem repeat list
     trfRegions = defaultdict(list)
@@ -947,7 +977,8 @@ def main(args):
                 repTypes.append('Other_Repeat')
         repType = ";".join(repTypes) + ";"
         rmRegions[chrom].append((int(regionStart), int(regionEnd), repType))
-
+    
+    '''
     # remove intermediate files
     os.remove(args.outPrefix + '.tmp.target.bed')
     os.remove(args.outPrefix + '.tmp.repeatMasker.bed')
@@ -956,26 +987,31 @@ def main(args):
     '''
 
     # set up header columns (Note: "headerAll" must parallel the output of the vc() function.)
-    headerAll = ('CHROM', 'POS', 'REF', 'ALT', 'TYPE', 'DP', 'FR' ,
-                     'MT', 'UFR', 'UMT', 'PI', 'VDP', 'VAF', 'VMT', 'VMF',
-                     'VSM', 'DP_A', 'DP_T', 'DP_G', 'DP_C', 'AF_A', 'AF_T', 'AF_G',
-                     'AF_C', 'MT_3RPM', 'MT_5RPM', 'MT_7RPM', 'MT_10RPM', 'UMT_A',
-                     'UMT_T', 'UMT_G', 'UMT_C', 'UMF_A', 'UMF_T', 'UMF_G', 'UMF_C',
-                     'VSM_A', 'VSM_T', 'VSM_G', 'VSM_C', 'PI_A', 'PI_T', 'PI_G', 'PI_C', 'FILTER')
-    headerVariants = ('CHROM', 'POS', 'REF', 'ALT', 'TYPE', 'DP', 'MT', 'UMT',
-                            'PI', 'THR', 'VMT', 'VMF', 'VSM', 'FILTER')
+    headerAll = (
+        'CHROM', 'POS', 'REF', 'ALT', 'TYPE', 'DP', 'FR', 'MT', 'UFR',
+        'UMT', 'PI', 'VDP', 'VAF', 'VMT', 'VMF', 'VSM', 'DP_A', 'DP_T',
+        'DP_G', 'DP_C', 'AF_A', 'AF_T', 'AF_G', 'AF_C', 'MT_3RPM',
+        'MT_5RPM', 'MT_7RPM', 'MT_10RPM', 'UMT_A', 'UMT_T', 'UMT_G',
+        'UMT_C', 'UMF_A', 'UMF_T', 'UMF_G', 'UMF_C', 'VSM_A', 'VSM_T',
+        'VSM_G', 'VSM_C', 'PI_A', 'PI_T', 'PI_G', 'PI_C', 'FILTER'
+    )
+    headerVariants = (
+        'CHROM', 'POS', 'REF', 'ALT', 'TYPE', 'DP', 'MT', 'UMT',
+        'PI', 'THR', 'VMT', 'VMF', 'VSM', 'FILTER'
+    )
 
     # set up hash of variable fields
     headerAllIndex = {}
     for i in range(len(headerAll)):
         headerAllIndex[headerAll[i]] = i
-    
+    print 'headerAllIndex--->',  headerAllIndex
+
     # ALL repeats filter. If MT fraction < 40% and the variant is inside the tandem repeat region, reject.
     for i in range(len(output)):
         outline = output[i]
         lineList = outline.split('\t')
         chromTr = lineList[headerAllIndex['CHROM']]
-        # altTr   = lineList[headerAllIndex['ALT']]
+        altTr   = lineList[headerAllIndex['ALT']]
         try:
             posTr = int(lineList[headerAllIndex['POS']])
         except ValueError:
@@ -988,7 +1024,7 @@ def main(args):
             pred = int(float(lineList[headerAllIndex['PI']]))
         except ValueError:
             pred = 0
-        '''
+        
         if pred >= 5 and altTr != 'DEL':
             # check tandem repeat from TRF if MT fraction < 40%
             if altMtFracTr < 40:
@@ -1002,50 +1038,49 @@ def main(args):
                 if locL < posTr <= locR:
                     lineList[-1] += repType
                     break
-        '''
+        
         lineList[-1] = 'PASS' if lineList[-1] == ';' else lineList[-1].strip(';')
         output[i] = '\t'.join(lineList)
-    
 
     # VCF header
     header_vcf = \
-            '##fileformat=VCFv4.2\n' + \
-            '##reference=GRCh37\n' + \
-            '##INFO=<ID=TYPE,Number=1,Type=String,Description="Variant type: SNP or INDEL">\n' + \
-            '##INFO=<ID=DP,Number=1,Type=Integer,Description="Total read depth">\n' + \
-            '##INFO=<ID=MT,Number=1,Type=Integer,Description="Total MT depth">\n' + \
-            '##INFO=<ID=UMT,Number=1,Type=Integer,Description="Filtered MT depth">\n' + \
-            '##INFO=<ID=PI,Number=1,Type=Float,Description="Variant prediction index">\n' + \
-            '##INFO=<ID=THR,Number=1,Type=Integer,Description="Variant prediction index minimum threshold">\n' + \
-            '##INFO=<ID=VMT,Number=1,Type=Integer,Description="Variant MT depth">\n' + \
-            '##INFO=<ID=VMF,Number=1,Type=Float,Description="Variant MT fraction">\n' + \
-            '##INFO=<ID=VSM,Number=1,Type=Integer,Description="Variant strong MT depth">\n' + \
-            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n' + \
-            '##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Filtered allelic MT depths for the ref and alt alleles">\n' + \
-            '##FORMAT=<ID=VF,Number=1,Type=Float,Description="Variant MT fraction, same as VMF">\n' + \
-            '##FILTER=<ID=RepT,Description="Variant in simple tandem repeat region, as defined by Tandem Repeats Finder">\n' + \
-            '##FILTER=<ID=RepS,Description="Variant in simple repeat region, as defined by RepeatMasker">\n' + \
-            '##FILTER=<ID=LowC,Description="Variant in low complexity region, as defined by RepeatMasker">\n' + \
-            '##FILTER=<ID=SL,Description="Variant in micro-satelite region, as defined by RepeatMasker">\n' + \
-            '##FILTER=<ID=HP,Description="Inside or flanked by homopolymer region">\n' + \
-            '##FILTER=<ID=LM,Description="Low coverage (fewer than 5 MTs)">\n' + \
-            '##FILTER=<ID=LSM,Description="Fewer than 2 strong MTs">\n' + \
-            '##FILTER=<ID=SB,Description="Strand bias">\n' + \
-            '##FILTER=<ID=LowQ,Description="Low base quality (mean < 22)">\n' + \
-            '##FILTER=<ID=MM,Description="Too many genome reference mismatches in reads (default threshold is 6.5 per 100 bases)">\n' + \
-            '##FILTER=<ID=DP,Description="Too many discordant read pairs">\n' + \
-            '##FILTER=<ID=R1CP,Description="Variants are clustered at the end of R1 reads">\n' + \
-            '##FILTER=<ID=R2CP,Description="Variants are clustered at the end of R2 reads">\n' + \
-            '##FILTER=<ID=PrimerCP,Description="Variants are clustered immediately after the primer, possible enzyme initiation error">\n' + \
-            '\t'.join(('#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', args.outPrefix)) + '\n'
+        '##fileformat=VCFv4.2\n' + \
+        '##reference=GRCh37\n' + \
+        '##INFO=<ID=TYPE,Number=1,Type=String,Description="Variant type: SNP or INDEL">\n' + \
+        '##INFO=<ID=DP,Number=1,Type=Integer,Description="Total read depth">\n' + \
+        '##INFO=<ID=MT,Number=1,Type=Integer,Description="Total MT depth">\n' + \
+        '##INFO=<ID=UMT,Number=1,Type=Integer,Description="Filtered MT depth">\n' + \
+        '##INFO=<ID=PI,Number=1,Type=Float,Description="Variant prediction index">\n' + \
+        '##INFO=<ID=THR,Number=1,Type=Integer,Description="Variant prediction index minimum threshold">\n' + \
+        '##INFO=<ID=VMT,Number=1,Type=Integer,Description="Variant MT depth">\n' + \
+        '##INFO=<ID=VMF,Number=1,Type=Float,Description="Variant MT fraction">\n' + \
+        '##INFO=<ID=VSM,Number=1,Type=Integer,Description="Variant strong MT depth">\n' + \
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n' + \
+        '##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Filtered allelic MT depths for the ref and alt alleles">\n' + \
+        '##FORMAT=<ID=VF,Number=1,Type=Float,Description="Variant MT fraction, same as VMF">\n' + \
+        '##FILTER=<ID=RepT,Description="Variant in simple tandem repeat region, as defined by Tandem Repeats Finder">\n' + \
+        '##FILTER=<ID=RepS,Description="Variant in simple repeat region, as defined by RepeatMasker">\n' + \
+        '##FILTER=<ID=LowC,Description="Variant in low complexity region, as defined by RepeatMasker">\n' + \
+        '##FILTER=<ID=SL,Description="Variant in micro-satelite region, as defined by RepeatMasker">\n' + \
+        '##FILTER=<ID=HP,Description="Inside or flanked by homopolymer region">\n' + \
+        '##FILTER=<ID=LM,Description="Low coverage (fewer than 5 MTs)">\n' + \
+        '##FILTER=<ID=LSM,Description="Fewer than 2 strong MTs">\n' + \
+        '##FILTER=<ID=SB,Description="Strand bias">\n' + \
+        '##FILTER=<ID=LowQ,Description="Low base quality (mean < 22)">\n' + \
+        '##FILTER=<ID=MM,Description="Too many genome reference mismatches in reads (default threshold is 6.5 per 100 bases)">\n' + \
+        '##FILTER=<ID=DP,Description="Too many discordant read pairs">\n' + \
+        '##FILTER=<ID=R1CP,Description="Variants are clustered at the end of R1 reads">\n' + \
+        '##FILTER=<ID=R2CP,Description="Variants are clustered at the end of R2 reads">\n' + \
+        '##FILTER=<ID=PrimerCP,Description="Variants are clustered immediately after the primer, possible enzyme initiation error">\n' + \
+        '\t'.join(('#CHROM', 'POS', 'ID', 'REF', 'ALT', 'QUAL', 'FILTER', 'INFO', 'FORMAT', args.outPrefix)) + '\n'
 
     # set cutoff value for about 20 FP/Mb
     threshold = int(math.ceil(14.0 + 0.012 * args.mtDepth)) if args.threshold == 0 else args.threshold
 
     # open output files
-    outAll      = open(args.outPrefix + '.smCounter.all.txt', 'w')
+    outAll = open(args.outPrefix + '.smCounter.all.txt', 'w')
     outVariants = open(args.outPrefix + '.smCounter.cut.txt', 'w')
-    outVcf      = open(args.outPrefix + '.smCounter.cut.vcf', 'w')
+    outVcf = open(args.outPrefix + '.smCounter.cut.vcf', 'w')
 
     # write column headers
     outAll.write('\t'.join(headerAll) + '\n')
@@ -1076,9 +1111,9 @@ def main(args):
             CHROM = fields[headerAllIndex['CHROM']]
             POS = fields[headerAllIndex['POS']]
             REF = fields[headerAllIndex['REF']]
-            TYPE    = fields[headerAllIndex['TYPE']]
-            DP      = fields[headerAllIndex['DP']]
-            MT      = fields[headerAllIndex['MT']]
+            TYPE = fields[headerAllIndex['TYPE']]
+            DP = fields[headerAllIndex['DP']]
+            MT = fields[headerAllIndex['MT']]
             UMT = fields[headerAllIndex['UMT']]
             VMT = fields[headerAllIndex['VMT']]
             VMF = fields[headerAllIndex['VMF']]
@@ -1107,15 +1142,15 @@ def main(args):
             # output
             FORMAT = 'GT:AD:VF'
             SAMPLE = ":".join((genotype,AD,VMF))
-            ID       = '.'
-            vcfLine  = '\t'.join((CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, SAMPLE)) + '\n'
-            shortLine = '\t'.join((CHROM, POS,      REF, ALT, TYPE, DP, MT, UMT, PI, THR, VMT, VMF, VSM, FILTER)) + '\n' 
+            ID = '.'
+            vcfLine = '\t'.join((CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, SAMPLE)) + '\n'
+            shortLine = '\t'.join((CHROM, POS, REF, ALT, TYPE, DP, MT, UMT, PI, THR, VMT, VMF, VSM, FILTER)) + '\n' 
             outVcf.write(vcfLine)
             outVariants.write(shortLine)
             
             # debug counter for summary
             if TYPE == 'SNP':
-                numCalledSnps    = 0
+                numCalledSnps = 0
             else:
                 numCalledIndels = 0
 
@@ -1124,15 +1159,18 @@ def main(args):
         POS = fields[headerAllIndex['POS']]
         REF = fields[headerAllIndex['REF']]
         TYPE = fields[headerAllIndex['TYPE']]
-        DP      = fields[headerAllIndex['DP']]
-        MT      = fields[headerAllIndex['MT']]
+        DP = fields[headerAllIndex['DP']]
+        MT = fields[headerAllIndex['MT']]
         UMT = fields[headerAllIndex['UMT']]
         VMT = fields[headerAllIndex['VMT']]
         VMF = fields[headerAllIndex['VMF']]
         VSM = fields[headerAllIndex['VSM']]
         FILTER= fields[headerAllIndex['FILTER']]
         THR = str(threshold)
-        INFO = ';'.join(('TYPE='+TYPE, 'DP='+DP, 'MT='+MT, 'UMT='+UMT, 'PI='+PI, 'THR='+THR, 'VMT='+VMT, 'VMF='+VMF, 'VSM='+VSM))
+        INFO = ';'.join((
+            'TYPE='+TYPE, 'DP='+DP, 'MT='+MT, 'UMT='+UMT, 'PI='+PI,
+            'THR='+THR, 'VMT='+VMT, 'VMF='+VMF, 'VSM='+VSM
+        ))
             
         # hack attempt to satisfy downstream software - not correct for germline heterozygous, male X, etc, etc, etc 
         alts = ALT.split(",")
@@ -1154,9 +1192,9 @@ def main(args):
         # output
         FORMAT = 'GT:AD:VF'
         SAMPLE = ":".join((genotype,AD,VMF))
-        ID       = '.'
-        vcfLine  = '\t'.join((CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, SAMPLE)) + '\n'
-        shortLine = '\t'.join((CHROM, POS,      REF, ALT, TYPE, DP, MT, UMT, PI, THR, VMT, VMF, VSM, FILTER)) + '\n' 
+        ID = '.'
+        vcfLine = '\t'.join((CHROM, POS, ID, REF, ALT, QUAL, FILTER, INFO, FORMAT, SAMPLE)) + '\n'
+        shortLine = '\t'.join((CHROM, POS, REF, ALT, TYPE, DP, MT, UMT, PI, THR, VMT, VMF, VSM, FILTER)) + '\n' 
         outVcf.write(vcfLine)
         outVariants.write(shortLine)
           
