@@ -835,8 +835,8 @@ def argParseInit(): # this is done inside a function because multiprocessing mod
     parser.add_argument('--primerDist', type=int, default=2, help='filter variants that are within X bases to primer')
     parser.add_argument('--threshold', type=int, default=0, help='Minimum prediction index for a variant to be called. Must be non-negative. Typically ranges from 10 to 60. If set to 0 (default), smCounter will choose the appropriate cutoff based on the mean MT depth.')
     parser.add_argument('--refGenome', default = '/qgen/home/rvijaya/downloads/alt_hap_masked_ref/ucsc.hg19.fasta')
-    parser.add_argument('--bedTandemRepeats', default = '/qgen/home/xuc/UCSC/simpleRepeat.bed', help = 'bed for UCSC tandem repeats')
-    parser.add_argument('--bedRepeatMaskerSubset', default = '/qgen/home/xuc/UCSC/SR_LC_SL.nochr.bed', help = 'bed for RepeatMasker simple repeats, low complexity, microsatellite regions')
+    parser.add_argument('--bedTandemRepeats', default = '/qgen/home/xuc/UCSC/simpleRepeat.bed', required=False, help = 'bed for UCSC tandem repeats')
+    parser.add_argument('--bedRepeatMaskerSubset', default = '/qgen/home/xuc/UCSC/SR_LC_SL.nochr.bed', required=False, help = 'bed for RepeatMasker simple repeats, low complexity, microsatellite regions')
     parser.add_argument('--bedtoolsPath', default = '/qgen/bin/bedtools-2.25.0/bin/', help = 'path to bedtools')
     parser.add_argument('--runPath', default=None, help='path to working directory')
     parser.add_argument('--logFile', default=None, help='log file')
@@ -907,16 +907,17 @@ def main(args):
     # report start of variant filtering
     print("begin variant filtering and output")
     
-    # merge and sort RepeatMasker tracks (could be done prior to run)  Note: assuming TRF repeat already merged and sorted!!
-    bedExe = args.bedtoolsPath + 'bedtools'
-    bedRepeatMasker = args.outPrefix + '.tmp.repeatMasker.bed'
-    cmd = ('{bedExe} merge -c 4 -o distinct -i {repeatbed} | '
-           '{bedExe} sort -i - > {out}').format(
-            bedExe=bedExe,
-            repeatbed=args.bedRepeatMaskerSubset,
-            out=bedRepeatMasker
-          )
-    subprocess.check_call(cmd, shell=True)
+    # merge and sort RepeatMasker tracks (could be done prior to run)  Note: assuming TRF repeat already merged and esorted!!
+    if args.bedRepeatMaskerSubset:
+        bedExe = args.bedtoolsPath + 'bedtools'
+        bedRepeatMasker = args.outPrefix + '.tmp.repeatMasker.bed'
+        cmd = ('{bedExe} merge -c 4 -o distinct -i {repeatbed} | '
+               '{bedExe} sort -i - > {out}').format(
+                bedExe=bedExe,
+                repeatbed=args.bedRepeatMaskerSubset,
+                out=bedRepeatMasker
+              )
+        subprocess.check_call(cmd, shell=True)
 
     # merge and sort target region
     bedTarget = args.outPrefix + '.tmp.target.bed'
@@ -929,49 +930,53 @@ def main(args):
     subprocess.check_call(cmd, shell=True)
     
     # intersect 2 repeats tracks with target region (for tandem repeats)
-    cmd = ('{bedExe} intersect -a {repeatbed} -b {targetbed} | '
-           '{bedExe} sort -i - > {outprefix}.tmp.target.repeats1.bed').format(
-           bedExe=bedExe,
-           repeatbed=args.bedTandemRepeats,
-           targetbed=bedTarget,
-           outprefix=args.outPrefix,
-          )
-    subprocess.check_call(cmd, shell=True)
+    if args.bedTandemRepeats:
+        cmd = ('{bedExe} intersect -a {repeatbed} -b {targetbed} | '
+               '{bedExe} sort -i - > {outprefix}.tmp.target.repeats1.bed').format(
+               bedExe=bedExe,
+               repeatbed=args.bedTandemRepeats,
+               targetbed=bedTarget,
+               outprefix=args.outPrefix,
+              )
+        subprocess.check_call(cmd, shell=True)
 
     # for simple repeats
-    cmd = ('{bedExe} intersect -a {repeatbed} -b {targetbed} | '
-          '{bedExe} sort -i -> {outprefix}.tmp.target.repeats2.bed').format(
-           bedExe=bedExe,
-           repeatbed=bedRepeatMasker,
-           targetbed=bedTarget,
-           outprefix=args.outPrefix,
-          )
-    subprocess.check_call(cmd, shell=True)
+    if args.bedRepeatMaskerSubset:
+        cmd = ('{bedExe} intersect -a {repeatbed} -b {targetbed} | '
+              '{bedExe} sort -i -> {outprefix}.tmp.target.repeats2.bed').format(
+               bedExe=bedExe,
+               repeatbed=bedRepeatMasker,
+               targetbed=bedTarget,
+               outprefix=args.outPrefix,
+              )
+        subprocess.check_call(cmd, shell=True)
 
     # read in tandem repeat list
-    trfRegions = defaultdict(list)
-    for line in open(args.outPrefix + '.tmp.target.repeats1.bed', 'r'):
-        vals = line.strip().split()
-        (chrom, regionStart, regionEnd) = vals[0:3]
-        trfRegions[chrom].append((int(regionStart), int(regionEnd), "RepT;"))
+    if args.bedTandemRepeats:
+        trfRegions = defaultdict(list)
+        for line in open(args.outPrefix + '.tmp.target.repeats1.bed', 'r'):
+            vals = line.strip().split()
+            (chrom, regionStart, regionEnd) = vals[0:3]
+            trfRegions[chrom].append((int(regionStart), int(regionEnd), "RepT;"))
 
     # read in simple repeat, low complexity, satelite list
     rmRegions = defaultdict(list)
-    for line in open(args.outPrefix + '.tmp.target.repeats2.bed', 'r'):
-        (chrom, regionStart, regionEnd, typeCodes) = line.strip().split()
-        repTypes = []
-        for typeCode in typeCodes.split(","):
-            if typeCode == 'Simple_repeat':
-                repTypes.append('RepS')
-            elif typeCode == 'Low_complexity':
-                repTypes.append('LowC')
-            elif typeCode == 'Satellite':
-                repTypes.append('SL')
-            else:
-                repTypes.append('Other_Repeat')
-        repType = ";".join(repTypes) + ";"
-        rmRegions[chrom].append((int(regionStart), int(regionEnd), repType))
-    
+    if args.bedRepeatMaskerSubset:
+        for line in open(args.outPrefix + '.tmp.target.repeats2.bed', 'r'):
+            (chrom, regionStart, regionEnd, typeCodes) = line.strip().split()
+            repTypes = []
+            for typeCode in typeCodes.split(","):
+                if typeCode == 'Simple_repeat':
+                    repTypes.append('RepS')
+                elif typeCode == 'Low_complexity':
+                    repTypes.append('LowC')
+                elif typeCode == 'Satellite':
+                    repTypes.append('SL')
+                else:
+                    repTypes.append('Other_Repeat')
+            repType = ";".join(repTypes) + ";"
+            rmRegions[chrom].append((int(regionStart), int(regionEnd), repType))
+        
     '''
     # remove intermediate files
     os.remove(args.outPrefix + '.tmp.target.bed')
