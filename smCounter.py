@@ -18,12 +18,14 @@ import scipy.stats
 # global contants (note that multiprocessing imports this .py file, so do not do much work outside functions)
 pcr_error = 1e-6
 pcr_no_error = 1.0 - 3e-5
+
 atgc = ('A', 'T', 'G', 'C')
 
 #-------------------------------------------------------------------------------------
 # function to calculate posterior probability for each barcode. 
 #-------------------------------------------------------------------------------------
 def calProb(oneBC, mtDrop):
+    # oneBC: read information of one barcode
     # oneBC: {'3LMDR:00198:00085': [['G', 0.00039810717055349735, None]]}
 
     print 'calProb()-----'
@@ -76,10 +78,8 @@ def calProb(oneBC, mtDrop):
             prob = info[0][1]  # 0.00039810717055349735
             pairOrder = info[0][2]  # pairOrder; None
 
-            '''
-            if pairOrder != 'Paired':
+            if pairOrder not in [None, 'Paired']:
                 prob = 0.1
-            '''
 
             # prodP is the probability of no sequencing error for each base
             prodP[base] *= 1.0 - prob
@@ -87,13 +87,6 @@ def calProb(oneBC, mtDrop):
 
             for char in list(uniqBase - set([base])):
                 prodP[char] *= prob
-
-                '''
-                {'A': 1.0, 'C': 1.0, 'T': 1.0, 'G': 1.0}
-                {'A': 0.00039810717055349735, 'C': 1.0, 'T': 1.0, 'G': 1.0}
-                {'A': 0.00039810717055349735, 'C': 0.00039810717055349735, 'T': 1.0, 'G': 1.0}
-                {'A': 0.00039810717055349735, 'C': 0.00039810717055349735, 'T': 0.00039810717055349735, 'G': 1.0}
-                '''
 
             # rightP is the probabilty that there is no sequencing error, hence the alternative alleles come from PCR error
             rightP *= 1.0 - prob
@@ -510,7 +503,8 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
 
                 # if the site is a regular locus, 
                 else: 
-                    base = pileupRead.alignment.query_sequence[pileupRead.query_position] # note: query_sequence includes soft clipped bases
+                    base = pileupRead.alignment.query_sequence[pileupRead.query_position]
+                    # note: query_sequence includes soft clipped bases
                     bq = pileupRead.alignment.query_qualities[pileupRead.query_position]
                     bqSum[base] += bq
                     # count the number of low quality reads (less than Q20 by default) for each base
@@ -581,7 +575,7 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
             # print 'bqSum:{}'.format(bqSum)
             # print 'alleleCnt:{}'.format(alleleCnt)
             # print 'mismatchCnt:{}'.format(mismatchCnt)
-            # print 'r1Cnt:{}, r2Cnt:{}'.format(r1Cnt, r2Cnt)
+            # print 'r1Cnt:{}, r2Cnt:{}, r0Cnt:{}'.format(r1Cnt, r2Cnt, r0Cnt)
             # print 'reverseCnt:{}'.format(reverseCnt)
             # print 'forwardCnt:{}'.format(forwardCnt)
 
@@ -1011,7 +1005,7 @@ def main(args):
         outline = output[i]
         lineList = outline.split('\t')
         chromTr = lineList[headerAllIndex['CHROM']]
-        altTr   = lineList[headerAllIndex['ALT']]
+        altTr = lineList[headerAllIndex['ALT']]
         try:
             posTr = int(lineList[headerAllIndex['POS']])
         except ValueError:
