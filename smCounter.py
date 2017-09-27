@@ -835,8 +835,8 @@ def argParseInit(): # this is done inside a function because multiprocessing mod
     parser.add_argument('--primerDist', type=int, default=2, help='filter variants that are within X bases to primer')
     parser.add_argument('--threshold', type=int, default=0, help='Minimum prediction index for a variant to be called. Must be non-negative. Typically ranges from 10 to 60. If set to 0 (default), smCounter will choose the appropriate cutoff based on the mean MT depth.')
     parser.add_argument('--refGenome', default = '/qgen/home/rvijaya/downloads/alt_hap_masked_ref/ucsc.hg19.fasta')
-    parser.add_argument('--bedTandemRepeats', default = '/qgen/home/xuc/UCSC/simpleRepeat.bed', required=False, help = 'bed for UCSC tandem repeats')
-    parser.add_argument('--bedRepeatMaskerSubset', default = '/qgen/home/xuc/UCSC/SR_LC_SL.nochr.bed', required=False, help = 'bed for RepeatMasker simple repeats, low complexity, microsatellite regions')
+    parser.add_argument('--bedTandemRepeats', default = None, required=False, help = 'bed for UCSC tandem repeats')
+    parser.add_argument('--bedRepeatMaskerSubset', default = None, required=False, help = 'bed for RepeatMasker simple repeats, low complexity, microsatellite regions')
     parser.add_argument('--bedtoolsPath', default = '/qgen/bin/bedtools-2.25.0/bin/', help = 'path to bedtools')
     parser.add_argument('--runPath', default=None, help='path to working directory')
     parser.add_argument('--logFile', default=None, help='log file')
@@ -908,8 +908,8 @@ def main(args):
     print("begin variant filtering and output")
     
     # merge and sort RepeatMasker tracks (could be done prior to run)  Note: assuming TRF repeat already merged and esorted!!
-    if args.bedRepeatMaskerSubset:
-        bedExe = args.bedtoolsPath + 'bedtools'
+    bedExe = args.bedtoolsPath + 'bedtools'
+    if args.bedRepeatMaskerSubset is not None:
         bedRepeatMasker = args.outPrefix + '.tmp.repeatMasker.bed'
         cmd = ('{bedExe} merge -c 4 -o distinct -i {repeatbed} | '
                '{bedExe} sort -i - > {out}').format(
@@ -930,7 +930,7 @@ def main(args):
     subprocess.check_call(cmd, shell=True)
     
     # intersect 2 repeats tracks with target region (for tandem repeats)
-    if args.bedTandemRepeats:
+    if args.bedTandemRepeats is not None:
         cmd = ('{bedExe} intersect -a {repeatbed} -b {targetbed} | '
                '{bedExe} sort -i - > {outprefix}.tmp.target.repeats1.bed').format(
                bedExe=bedExe,
