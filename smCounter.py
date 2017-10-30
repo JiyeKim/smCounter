@@ -952,8 +952,8 @@ def main(args):
         subprocess.check_call(cmd, shell=True)
 
     # read in tandem repeat list
+    trfRegions = defaultdict(list)
     if args.bedTandemRepeats:
-        trfRegions = defaultdict(list)
         for line in open(args.outPrefix + '.tmp.target.repeats1.bed', 'r'):
             vals = line.strip().split()
             (chrom, regionStart, regionEnd) = vals[0:3]
