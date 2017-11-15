@@ -28,9 +28,6 @@ def calProb(oneBC, mtDrop):
     # oneBC: read information of one barcode
     # oneBC: {'3LMDR:00198:00085': [['G', 0.00039810717055349735, None]]}
 
-    print 'calProb()-----'
-    print 'oneBC:{}, mtDrop:{}'.format(oneBC, mtDrop)
-
     outDict = defaultdict(float)
     if len(oneBC) <= mtDrop:  # number of reads <= mtDrop
         outDict['A'] = 0.0
@@ -62,8 +59,6 @@ def calProb(oneBC, mtDrop):
                       break
 
         uniqBaseList = list(uniqBase)
-        print 'uniqBase:{}'.format(uniqBase)
-        print 'uniqBaseList:{}'.format(uniqBaseList)
 
         # set initial value in prodP to be 1.0
         for b in uniqBaseList:
@@ -90,12 +85,6 @@ def calProb(oneBC, mtDrop):
 
             # rightP is the probabilty that there is no sequencing error, hence the alternative alleles come from PCR error
             rightP *= 1.0 - prob
-
-        '''
-        print 'prodP:', prodP
-        print 'rightP:', rightP
-        print 'cnt -->', cnt
-        '''
 
         for char in uniqBaseList:   # ['A', 'T', 'G', 'C']
             ratio = (cnt[char] + 0.5) / (len(oneBC) + 0.5 * len(uniqBaseList))
@@ -331,7 +320,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
         smt = 3.0
     else:
         smt = 4.0
-    print 'smt:{}'.format(smt)
 
     # get reference base
     refseq = pysam.FastaFile(refGenome)
@@ -354,18 +342,14 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
             qnameSplit = qname.split(":")
             readid = ':'.join(qnameSplit[:-2])
 
-            print '\n\n*QNAME:{}'.format(qname)
-            print 'Query sequence:{}'.format(pileupRead.alignment.query_sequence)
 
             # barcode sequence
             BC = qnameSplit[-2]
-            print 'Barcode(BC):{}'.format(BC)
             # duplex tag - temporary hack from end of readid - should be CC, TT, or NN for duplex runs
             duplexTag = qnameSplit[-3]
 
             # mapping quality
             mq = pileupRead.alignment.mapping_quality
-            print 'mapping quality(mq):{}'.format(mq)
 
             # get NM tag 
             NM = 0 
@@ -374,14 +358,11 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
                 if tag == 'NM':  # 
                     NM = value
                     break
-            print 'Edit distance tag(NM):{}'.format(NM)
             # NM: number of changes necessary to make this equal the reference, excluding clipping
 
             # count number of INDELs in the read sequence
             nIndel = 0
             cigar = pileupRead.alignment.cigar
-            print 'CIGAR:{}'.format(cigar)
-            print 'CIGAR:{}'.format(pileupRead.alignment.cigarstring)
 
             cigarOrder = 1
             leftSP = 0  # soft clipped bases on the left
@@ -395,8 +376,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
                 if cigarOrder > 1 and op == 4:
                     rightSP += value
                 cigarOrder += 1
-            print 'nIndel:{}, cigarOrder:{}, leftSP:{}, rightSP:{}'.format(
-                nIndel, cigarOrder, leftSP, rightSP)
 
             # Number of mismatches except INDEL, including softcilpped sequences 
             mismatch = max(0, NM - nIndel)
@@ -404,8 +383,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
             readLen = pileupRead.alignment.query_length
             # calculate mismatch per 100 bases
             mismatchPer100b = 100.0 * mismatch / readLen if readLen > 0 else 0.0
-            print 'mismatch:{}, readLen:{}, mismatch%:{}'.format(
-                mismatch, readLen, mismatchPer100b)
 
             # paired read
             if pileupRead.alignment.is_read1:
@@ -418,30 +395,16 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
 
             # +/- strand
             strand = 'Reverse' if pileupRead.alignment.is_reverse else 'Forward'
-            print 'is_read1:{}, is_read2:{}, final pairOrder:{}, strand:{}'.format(
-                pileupRead.alignment.is_read1,
-                pileupRead.alignment.is_read2,
-                pairOrder,
-                strand,
-            )
 
             # coverage -- read, not fragment
             cvg += 1
 
             # 1. check if the site is the beginning of insertion
-            print 'pileupRead.query_position:{}'.format(pileupRead.query_position)
-            # PileupRead.indel: indel length for the position following the current pileup site
-            print 'pileupRead.indel:{}'.format(pileupRead.indel)
-            print 'pileupRead.is_del:{}'.format(pileupRead.is_del)
-            print 'query alignment length:{}'.format(pileupRead.alignment.query_alignment_length)
-            print 'query alignment sequence:{}'.format(pileupRead.alignment.query_alignment_sequence)
-
             if pileupRead.indel > 0:
                 site = pileupRead.alignment.query_sequence[pileupRead.query_position]
                 inserted = pileupRead.alignment.query_sequence[
                     (pileupRead.query_position + 1) : \
                     (pileupRead.query_position + 1 +  pileupRead.indel)]
-                print 'site:{}, inserted:{}'.format(site, inserted)
 
                 base = 'INS|' + site + '|' + site + inserted
                 bq = pileupRead.alignment.query_qualities[pileupRead.query_position]
@@ -552,32 +515,8 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
                     else:
                         forwardCnt[base] += 1
 
-                    print 'distToBcEnd:{}'.format(distToBcEnd)
-                    # print 'r2BcEndPos:{}'.format(r2BcEndPos)
-                    # print 'r2PrimerEndPos:{}'.format(r2PrimerEndPos)
-                    print 'r0BcEndPos:{}'.format(r0BcEndPos)
-                    print 'r0PrimerEndPos:{}'.format(r0PrimerEndPos)
-
                 alleleCnt[base] += 1
                 mismatchCnt[base] += mismatchPer100b
-
-            print 'base:{}'.format(base)
-            print 'is_reverse:{}'.format(pileupRead.alignment.is_reverse)
-            print 'strand:{}'.format(strand)
-
-            print '=== incCond:{} ==='.format(incCond)
-            '''
-            print '\t--bq >= minBQ ? {} >= {}, {}'.format(bq, minBQ, bq >= minBQ)
-            print '\t--mq >= minMQ ? {} >= {}, {}'.format(mq, minMQ, mq >= minMQ)
-            print '\tmismatch% <= mismatchThr ? {} <= {}, {}'.format(
-                mismatchPer100b, mismatchThr, mismatchPer100b <= mismatchThr)
-            '''
-            # print 'bqSum:{}'.format(bqSum)
-            # print 'alleleCnt:{}'.format(alleleCnt)
-            # print 'mismatchCnt:{}'.format(mismatchCnt)
-            # print 'r1Cnt:{}, r2Cnt:{}, r0Cnt:{}'.format(r1Cnt, r2Cnt, r0Cnt)
-            # print 'reverseCnt:{}'.format(reverseCnt)
-            # print 'forwardCnt:{}'.format(forwardCnt)
 
             # count total number of fragments and MTs
             if readid not in allBcDict[BC]:
@@ -606,19 +545,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
             else:
                 continue
 
-            print '=== bcDict ===\n{}'.format(bcDict)
-            print '-'*60
-        
-
-        print 'at position {}:{} result---------'.format(chrom, pos)
-        print 'Total Barcodes:{}'.format(len(allBcDict))
-        print 'Passed Barcodes:{}'.format(len(bcDict))
-        print '=' * 60
-
-    print 'final BcDict------'
-    print 'allBcDict({}):{}'.format(len(allBcDict), allBcDict.keys())
-    print 'bcDict({}):{}'.format(len(bcDict), bcDict.keys())
-    
     '''
     allBcDict = {
         'chr10-0-43606627-CAAAACGCAATA': ['3LMDR:00595:00544'],
@@ -639,7 +565,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
     # total number of MT, fragments, reads, including those dropped from analysis
     allMT = len(allBcDict)  # number of barcodes
     allFrag = sum([len(allBcDict[bc]) for bc in allBcDict])  # number of reads
-    print 'barcodes#(allMt):{}, reads#(allFrag):{}'.format(allMT, allFrag)
 
     # downsampling MTs (not dropped) to args.maxMT
 
@@ -649,8 +574,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
 
     # MTs used
     usedMT = min(ds, len(bcDict))  # choose minimum barcode number
-    print 'downsample(ds, maxMT):{}'.format(ds)
-    print 'MTs used:{}'.format(usedMT)
 
     # done if zero coverage (note hack for 41 blank output fields!)
     # bcDict has no reads
@@ -661,19 +584,15 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
     if len(bcDict) > ds:
         random.seed(pos)
         bcKeys = random.sample(bcDict.keys(), ds)  # choose random X MTs among barcodes (X=ds)
-        print 'downsampled random barcodes:{}'.format(bcKeys)
     else:  # no need to downsample
         bcKeys = bcDict.keys()
     usedFrag = sum([len(bcDict[bc]) for bc in bcKeys])  # number of downsampled reads
-    print 'downsampled reads#(usedFrag):{}'.format(usedFrag)
 
     totalR1 = sum(r1Cnt.values())
     totalR2 = sum(r2Cnt.values())
     totlaR0 = sum(r0Cnt.values())
-    print 'totlaR0:{}'.format(totlaR0)
 
     for bc in bcKeys:
-        print "P to Q, and find max base for {}".format(bc)
 
         bcProb = calProb(bcDict[bc], mtDrop)
 
@@ -693,12 +612,10 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
             finalDict[char] += log10P
 
         max_base = [x for x in predIndex[bc].keys() if predIndex[bc][x] == max(predIndex[bc].values())]
-        print 'max_base:{} in barcode({})'.format(max_base, bc)
         # max_base: ['G']  the base which has max log10 value in one barcode
         
         if len(max_base) == 1:
             cons = max_base[0]
-            print "MTCnt + 1 !! now for base {}".format(cons)
             MTCnt[cons] += 1
             if predIndex[bc][cons] > smt:  # check threshold < current index value
                 strongMTCnt[cons] += 1
@@ -707,7 +624,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
 
         if len(bcDict[bc]) == 1:  # only one read in barcode
             cons = bcDict[bc].values()[0][0][0]
-            print "MTCnt + 1 !! now for base {}".format(cons)
             MTCnt[cons] += 1
 
         if len(bcDict[bc]) >= 3:
@@ -719,13 +635,7 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
         if len(bcDict[bc]) >= 10:
             MT10Cnt += 1
 
-    print 'predIndex:{}'.format(predIndex)
-    print 'finalDict:{}'.format(finalDict)
-    print 'strongMTCnt:{}'.format(strongMTCnt)
-    print 'MTCnt:{}'.format(MTCnt)
-
     sortedList = sorted(finalDict.items(), key=operator.itemgetter(1), reverse=True)
-    print 'sortedList:{}'.format(sortedList)
     maxBase = sortedList[0][0]
     maxPI = sortedList[0][1]
     secondMaxBase = sortedList[1][0]
@@ -734,12 +644,9 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
     # call variants
     origAlt = secondMaxBase if maxBase == origRef else maxBase
     altPI = secondMaxPI if maxBase == origRef else maxPI
-    print 'call variants------'
-    print 'origRef:{}, origAlt:{}, altPI:{}'.format(origRef, origAlt, altPI)
 
     # convert from internal smCounter format to format needed for output
     (ref, alt, vtype) = convertToVcf(origRef,origAlt)
-    print 'VCF line:{}'.format((ref, alt, vtype))
 
     # apply filters if PI >= 5 (at least 2 MTs), and locus not in a deletion
     fltr = ';'
@@ -772,9 +679,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
             origAlt = origAlt2
 
     # build detailed output vector
-    print 'build detailed output-------'
-    print 'alleleCnt:{}'.format(alleleCnt)
-    print 'coverage(cvg):{}'.format(cvg)
 
     frac_alt = round((1.0 * alleleCnt[origAlt] / cvg),4)     # based on all reads, including the excluded reads
     frac_A  = round((1.0 * alleleCnt['A'] / cvg),4)
@@ -783,9 +687,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
     frac_C  = round((1.0 * alleleCnt['C'] / cvg),4)
     fracs = (alleleCnt['A'], alleleCnt['T'], alleleCnt['G'], alleleCnt['C'], frac_A, frac_T, frac_G, frac_C)
     
-    print 'MTCnt:{}'.format(MTCnt)
-    print 'usedMT:{}'.format(usedMT)
-
     MT_f_alt = round((1.0 * MTCnt[origAlt] / usedMT),4)  # based on only used MTs
     MT_f_A  = round((1.0 * MTCnt['A'] / usedMT),4)
     MT_f_T  = round((1.0 * MTCnt['T'] / usedMT),4)
@@ -803,7 +704,6 @@ def vc(bamFile, chrom, pos, minBQ, minMQ, mtDepth, rpb, hpLen,
     outvec.extend(predIdx)
     outvec.append(fltr)
     out_long = '\t'.join((str(x) for x in outvec))
-    print 'out_log====>{}'.format(out_long)
     return out_long
 
 #------------------------------------------------------------------------------------------------
@@ -848,7 +748,6 @@ def argParseInit(): # this is done inside a function because multiprocessing mod
 def main(args):
     # log run start
     timeStart = datetime.datetime.now()
-    print "smCounter started at " + str(timeStart)
 
     # if argument parser global not assigned yet, initialize it
     if parser == None:
@@ -881,7 +780,6 @@ def main(args):
             for pos in range(int(regionStart), int(regionEnd)):
                 locList.append((chrom, str(pos+1)))
 
-    print 'locList ----> {}'.format(locList)
     pool = multiprocessing.Pool(processes=args.nCPU)
     results = [
         pool.apply_async(
@@ -1003,7 +901,6 @@ def main(args):
     headerAllIndex = {}
     for i in range(len(headerAll)):
         headerAllIndex[headerAll[i]] = i
-    print 'headerAllIndex--->',  headerAllIndex
 
     # ALL repeats filter. If MT fraction < 40% and the variant is inside the tandem repeat region, reject.
     for i in range(len(output)):
